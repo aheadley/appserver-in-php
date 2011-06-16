@@ -2,119 +2,108 @@
 
 namespace AiP\Middleware\HTTPParser;
 
-class Cookies implements \ArrayAccess
-{
-    private $headers = array();
-    private $cookies = array();
+class Cookies implements \ArrayAccess {
 
-    public function __construct($cookiestr = null)
-    {
-        if (null === $cookiestr) {
-            return;
-        }
+  private $_headers = array( );
+  private $_cookies = array( );
 
-        $pairs = explode('; ', $cookiestr);
-
-        foreach ($pairs as $pair) {
-            list($name, $value) = explode('=', $pair);
-            $this->cookies[$name] = urldecode($value);
-        }
+  public function __construct( $cookiestr = null ) {
+    if( null === $cookiestr ) {
+      return;
     }
 
+    $pairs = explode( '; ', $cookiestr );
 
-    public function setcookie($name, $value, $expire = 0, $path = null, $domain = null, $secure = false, $httponly = false)
-    {
-        $this->addHeader('Set-Cookie', self::cookie_headervalue($name, $value, $expire, $path, $domain, $secure, $httponly, false));
-        $this->cookies[$name] = $value;
+    foreach( $pairs as $pair ) {
+      list($name, $value) = explode( '=', $pair );
+      $this->_cookies[$name] = urldecode( $value );
+    }
+  }
+
+  public function setcookie( $name, $value, $expire = 0, $path = null,
+    $domain = null, $secure = false, $httponly = false ) {
+    $this->_addHeader( 'Set-Cookie',
+      self::_cookieHeaderValue( $name, $value, $expire, $path, $domain, $secure,
+        $httponly, false ) );
+    $this->_cookies[$name] = $value;
+  }
+
+  public function setrawcookie( $name, $value, $expire = 0, $path = null,
+    $domain = null, $secure = false, $httponly = false ) {
+    $this->_addHeader( 'Set-Cookie',
+      self::_cookieHeaderValue( $name, $value, $expire, $path, $domain, $secure,
+        $httponly, true ) );
+    $this->_cookies[$name] = $value;
+  }
+
+  public function __toArray() {
+    return $this->_cookies;
+  }
+
+  public function offsetExists( $offset ) {
+    return array_key_exists( $offset, $this->_cookies );
+  }
+
+  public function offsetGet( $offset ) {
+    if( !$this->offsetExists( $offset ) ) throw new OutOfBoundsException();
+
+    return $this->_cookies[$offset];
+  }
+
+  public function offsetSet( $offset, $value ) {
+    throw new LogicException();
+  }
+
+  public function offsetUnset( $offset ) {
+    throw new LogicException();
+  }
+
+  public function _getHeaders() {
+    return $this->_headers;
+  }
+
+  private function _addHeader( $name, $value ) {
+    $this->_headers[] = $name;
+    $this->_headers[] = $value;
+  }
+
+  // This one almost directly copies php_setcookie() function from php-core
+  private static function _cookieHeaderValue( $name, $value, $expire, $path,
+    $domain, $secure, $httponly, $raw ) {
+    if( false !== strpbrk( $name, "=,; \t\r\n\013\014" ) ) {
+      throw new UnexpectedValueException( "Cookie names can not contain any of the following: '=,; \\t\\r\\n\\013\\014'" );
     }
 
-    public function setrawcookie($name, $value, $expire = 0, $path = null, $domain = null, $secure = false, $httponly = false)
-    {
-        $this->addHeader('Set-Cookie', self::cookie_headervalue($name, $value, $expire, $path, $domain, $secure, $httponly, true));
-        $this->cookies[$name] = $value;
+    if( true === $raw && false !== strpbrk( $value, ",; \t\r\n\013\014" ) ) {
+      throw new UnexpectedValueException( "Cookie values can not contain any of the following: ',; \\t\\r\\n\\013\\014'" );
     }
 
-    public function __toArray()
-    {
-        return $this->cookies;
+    $string = $name . '=';
+
+    if( '' == $value ) {
+      // deleting
+      $string .= 'deleted; expires=' . date( "D, d-M-Y H:i:s T",
+          time() - 31536001 );
+    } else {
+      if( true === $raw ) {
+        $string .= $value;
+      } else {
+        $string .= urlencode( $value );
+      }
+
+      if( $expire > 0 ) {
+        $string .= '; expires=' . date( "D, d-M-Y H:i:s T", $expire );
+      }
     }
 
+    if( null !== $path ) $string .= '; path=' . $path;
 
-    public function offsetExists($offset)
-    {
-        return array_key_exists($offset, $this->cookies);
-    }
+    if( null !== $domain ) $string .= '; domain=' . $domain;
 
-    public function offsetGet($offset)
-    {
-        if (!$this->offsetExists($offset))
-            throw new OutOfBoundsException();
+    if( true === $secure ) $string .= '; secure';
 
-        return $this->cookies[$offset];
-    }
+    if( true === $httponly ) $string .= '; httponly';
 
-    public function offsetSet($offset, $value)
-    {
-        throw new LogicException();
-    }
-
-    public function offsetUnset($offset)
-    {
-        throw new LogicException();
-    }
-
-
-    public function _getHeaders()
-    {
-        return $this->headers;
-    }
-
-    private function addHeader($name, $value)
-    {
-        $this->headers[] = $name;
-        $this->headers[] = $value;
-    }
-
-    // This one almost directly copies php_setcookie() function from php-core
-    private static function cookie_headervalue($name, $value, $expire, $path, $domain, $secure, $httponly, $raw)
-    {
-        if (false !== strpbrk($name, "=,; \t\r\n\013\014")) {
-            throw new UnexpectedValueException("Cookie names can not contain any of the following: '=,; \\t\\r\\n\\013\\014'");
-        }
-
-        if (true === $raw && false !== strpbrk($value, ",; \t\r\n\013\014")) {
-            throw new UnexpectedValueException("Cookie values can not contain any of the following: ',; \\t\\r\\n\\013\\014'");
-        }
-
-        $string = $name.'=';
-
-        if ('' == $value) {
-            // deleting
-            $string .= 'deleted; expires='.date("D, d-M-Y H:i:s T", time() - 31536001);
-        } else {
-            if (true === $raw) {
-                $string .= $value;
-            } else {
-                $string .= urlencode($value);
-            }
-
-            if ($expire > 0) {
-                $string .= '; expires='.date("D, d-M-Y H:i:s T", $expire);
-            }
-        }
-
-        if (null !== $path)
-            $string .= '; path='.$path;
-
-        if (null !== $domain)
-            $string .= '; domain='.$domain;
-
-        if (true === $secure)
-            $string .= '; secure';
-
-        if (true === $httponly)
-            $string .= '; httponly';
-
-        return $string;
-    }
+    return $string;
+  }
 }
