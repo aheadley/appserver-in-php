@@ -2,7 +2,7 @@
 
 namespace AiP\Middleware\Session;
 
-class Engine implements ArrayAccess {
+class Engine implements \ArrayAccess {
 
   private $_cookies = array( );
   private $_headers = array( );
