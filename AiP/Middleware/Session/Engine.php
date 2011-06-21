@@ -256,16 +256,6 @@ class Engine implements \ArrayAccess {
   }
   
   /**
-   * Check if a cookie name is valid.
-   *
-   * @param string $name
-   * @return bool 
-   */
-  protected function _validateCookieName( $name ) {
-    return !(bool)strpbrk( $name, "=,; \t\r\n\013\014" );
-  }
-  
-  /**
    * Reset the session engine, used after closing a session.
    */
   private function _reset( $keepHandler = false ) {
@@ -368,6 +358,16 @@ class Engine implements \ArrayAccess {
       $this->_options['cookie_httponly'] );
     $this->_cookies[$this->_options['cookie_name']] = $value;
   }
+  
+  /**
+   * Check if a cookie name is valid.
+   *
+   * @param string $name
+   * @return bool 
+   */
+  protected static function _validateCookieName( $name ) {
+    return !(bool)strpbrk( $name, "=,; \t\r\n\013\014" );
+  }
 
   /**
    * Create the session id cookie header value string.
@@ -383,7 +383,7 @@ class Engine implements \ArrayAccess {
    */
   private static function _cookieHeaderValue( $name, $value, $expire, $path,
     $domain, $secure, $httponly ) {
-    if( !$this->_validateCookieName(  $name ) ) {
+    if( self::_validateCookieName( $name ) ) {
       throw new UnexpectedValueException(
         "Cookie names can not contain any of the following:" .
           " '=,; \\t\\r\\n\\013\\014'" );
