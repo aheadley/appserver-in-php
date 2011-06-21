@@ -109,8 +109,11 @@ class FileStorage extends AbstractStorage {
   }
   
   protected function _getDefaultOptions() {
-    $savePath = empty( realpath( ini_get( 'session.save_path' ) ) ) ?
-      '/tmp' : realpath( ini_get( 'session.save_path' ) );
+    if( !realpath( ini_get( 'session.save_path' ) ) ) {
+      $savePath = '/tmp';
+    } else {
+      $savePath = realpath( ini_get( 'session.save_path' ) );
+    }
     return array(
       'save_path'         => $savePath,
       'filename_pattern'  => 'sess_%s',
