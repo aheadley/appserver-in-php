@@ -80,13 +80,12 @@ class Engine implements \ArrayAccess {
     $this->setOptions( array() );
   }
 
-  /**
-   * Get a session var. Triggers notice if var has not been set.
-   *
-   * @param int|string $offset
-   * @return mixed
-   */
-  public function __get( $offset ) {
+  public function offsetExists( $offset ) {
+    $this->_ensureStarted();
+    return array_key_exists( $offset, $this->_vars );
+  }
+  
+  public function offsetGet( $offset ) {
     $this->_ensureStarted();
     if( !array_key_exists( $offset, $this->_vars ) ) {
       trigger_error( sprintf( 'Undefined offset: %s in %s at line %d', $offset, __FILE__, __LINE__ ) );
@@ -94,54 +93,17 @@ class Engine implements \ArrayAccess {
     } else {
       return $this->_vars[$offset];
     }
-  }
-
-  /**
-   * Set a session var.
-   *
-   * @param int|string $offset
-   * @param mixed $value
-   */
-  public function __set( $offset, $value ) {
-    $this->_ensureStarted();
-    $this->_vars[$offset] = $value;
-  }
-
-  /**
-   * Check if a session var is set.
-   *
-   * @param int|string $offset
-   * @return mixed
-   */
-  public function __isset( $offset ) {
-    $this->_ensureStarted();
-    return array_key_exists( $offset, $this->_vars );
-  }
-
-  /**
-   * Unset a session var.
-   *
-   * @param int|string $offset 
-   */
-  public function __unset( $offset ) {
-    $this->_ensureStarted();
-    unset( $this->_vars[$offset] );
-  }
-  
-  public function offsetExists( $offset ) {
-    return $this->__isset( $offset );
-  }
-  
-  public function offsetGet( $offset ) {
     return $this->__get( $offset );
   }
   
   public function offsetSet( $offset, $value ) {
-    return $this->__set( $offset, $value );
+    $this->_ensureStarted();
+    $this->_vars[$offset] = $value;
   }
   
   public function offsetUnset( $offset ) {
-    return $this->__unset( $offset );
+    $this->_ensureStarted();
+    unset( $this->_vars[$offset] );
   }
   
   /**
