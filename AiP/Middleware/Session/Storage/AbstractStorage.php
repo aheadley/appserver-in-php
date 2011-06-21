@@ -89,6 +89,7 @@ abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
    * @return string 
    */
   protected function _serialize( array $data ) {
+    return serialize( $data );
     $oldSession = $_SESSION;
     $_SESSION = $data;
     $dataString = session_encode();
@@ -103,6 +104,7 @@ abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
    * @return array
    */
   protected function _unserialize( $dataString ) {
+    return unserialize( $dataString );
     $oldSession = $_SESSION;
     $_SESSION = array(); //make sure we have a clean slate
     if( !session_decode( $dataString ) ) {

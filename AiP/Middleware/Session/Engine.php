@@ -383,7 +383,7 @@ class Engine implements \ArrayAccess {
    */
   private static function _cookieHeaderValue( $name, $value, $expire, $path,
     $domain, $secure, $httponly ) {
-    if( self::_validateCookieName( $name ) ) {
+    if( !self::_validateCookieName( $name ) ) {
       throw new UnexpectedValueException(
         "Cookie names can not contain any of the following:" .
           " '=,; \\t\\r\\n\\013\\014'" );
