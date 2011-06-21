@@ -56,14 +56,6 @@ abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
     return $this->open( $this->_getFreeId() );
   }
   
-  abstract public function open( $sessionId );
-  abstract public function isOpen();
-  abstract public function close();
-  abstract public function read();
-  abstract public function write( $sessionData );
-  abstract public function destroy();
-  abstract public function gc( $maxLifeTime );
-  
   /**
    * Get the default options of this storage method as an array.
    * 
