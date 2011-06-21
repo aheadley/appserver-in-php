@@ -241,7 +241,7 @@ class Engine implements \ArrayAccess {
    * @return array
    */
   public function getSessionCookieHeaders() {
-    $this->_ensureStarted();
+    //$this->_ensureStarted();
     return $this->_headers;
   }
   
@@ -280,6 +280,7 @@ class Engine implements \ArrayAccess {
    */
   protected function _ensureStarted() {
     if( !$this->isStarted() ) {
+file_put_contents('trace.log', print_r( debug_backtrace(), true ) );
       throw new LogicException( 'Session has not been started' );
     }
   }
