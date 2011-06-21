@@ -8,16 +8,23 @@ interface Storage {
    * 
    * @param array $options
    */
-  public function __construct(array $options);
+  public function __construct( array $options );
   
   /**
-   * Open the engine (prepare for session writing).
+   * Create a new session id and open with it.
    * 
-   * @param string $savePath
-   * @param string $sessionName
-   * @return bool
+   * @return string
    */
-  public function open( $savePath, $sessionName );
+  public function create();
+  
+  /**
+   * Open the engine (prepare for session writing). Returns the session id it
+   * opened.
+   * 
+   * @param string $sessionId
+   * @return string
+   */
+  public function open( $sessionId );
   
   /**
    * Close the engine (no more session writing?)
@@ -29,27 +36,24 @@ interface Storage {
   /**
    * Read the session data for an ID
    * 
-   * @param string $sessionId
    * @return string
    */
-  public function read( $sessionId );
+  public function read();
   
   /**
    * Write the session data for an ID
    * 
-   * @param string $sessionId
-   * @param string $sessionData
+   * @param array $sessionData
    * @return bool
    */
-  public function write( $sessionId, $sessionData );
+  public function write( array $sessionData );
   
   /**
    * Delete the session data for an ID
    * 
-   * @param string $sessionId
    * @return bool
    */
-  public function destroy( $sessionId );
+  public function destroy();
   
   /**
    * Collect garbage sessions (with a lifetime greater than $maxLifeTime).
@@ -57,21 +61,6 @@ interface Storage {
    * @param int $maxLifeTime
    */
   public function gc( $maxLifeTime );
-  
-  /**
-   * Check if a session id is available.
-   * 
-   * @param string $id
-   * @return bool
-   */
-  public function isIdFree( $id );
-  
-  /**
-   * Get a free session id for use in a new session.
-   * 
-   * @return string
-   */
-  public function getFreeId();
   
   /**
    * Check if we've been open()'d

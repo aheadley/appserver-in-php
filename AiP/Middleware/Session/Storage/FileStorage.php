@@ -2,145 +2,124 @@
 
 namespace AiP\Middleware\Session\Storage;
 
-class FileStorage implements \AiP\Middleware\Session\Storage {
-  const MAGIC = 'AIP_SESSION';
-
-  private $options;
-  private $name = null;
-  private $_fp = null;
-  private $vars = array( );
-
-  public function __construct( array $options ) {
-    $this->options = array_merge(
-      array(
-      'save_path' => ini_get( 'session.save_path' ),
-      ), $options
-    );
-
-    $dir = $this->options['save_path'];
-
-    if( empty( $dir ) or !is_dir( $dir ) )
-        throw new RuntimeException( '"' . $dir . '" is not a valid directory' );
-
-    if( !is_writable( $dir ) )
-        throw new RuntimeException( 'Noe enough rights to write to "' . $dir . '"' );
-  }
-
-  public function open( $name ) {
-    $this->name = $name;
-
-    $this->validateSessionFile();
-
-    $this->lock();
-    $this->readData();
-
-    return $this->vars;
-  }
-
-  public function create( $name ) {
-    if( null !== $this->name ) {
-      throw new LogicException( 'session is opened already' );
+class FileStorage extends AbstractStorage {
+  
+  protected $_handle    = null;
+  
+  public function open( $sessionId ) {
+    $this->_ensureClosed( true );
+    if( $this->_validateId( $sessionId ) ) {
+      $this->_id = $sessionId;
+      $this->_lock();
+      if( file_exists( $this->getSessionFilename() ) ) {
+        $this->_data = $this->_unserialize( file_get_contents(
+          $this->getSessionFilename() ) );
+      } else {
+        $this->_data = array();
+      }
+      return $this->_id;
+    } else {
+      throw new UnexpectedValueException( 'Invalid session id: ' . $sessionId );
     }
-
-    if( !self::idIsFree( $name ) )
-        throw new IdIsTakenException( 'session-name is already taken' );
-
-    $this->name = $name;
-
-    $this->lock();
   }
-
-  public function save( array $vars ) {
-    if( null === $this->name ) {
-      throw new LogicException( 'session is not opened' );
+  
+  public function isOpen() {
+    return !is_null( $this->_id );
+  }
+  
+  public function close() {
+    if( $this->isOpen() ) {
+      $this->_flush();
+      $this->_unlock();
+      $this->_id = null;
     }
-
-    $this->vars = $vars;
-
-    $this->flushData();
-    $this->unlock();
-
-    $this->name = null;
   }
-
+  
+  public function read() {
+    $this->_ensureOpen( true );
+    return $this->_data;
+  }
+  
+  public function write( array $sessionData ) {
+    $this->_ensureOpen( true );
+    $this->_data = $sessionData;
+  }
+  
   public function destroy() {
-    if( null === $this->name ) {
-      throw new LogicException( 'session is not opened' );
+    if( $this->isOpen() ) {
+      $this->_unlock();
+      unlink( $this->getSessionFilename() );
+      $this->_id = null;
     }
-
-    $this->unlock();
-    unlink( $this->getSessionFilename() );
-
-    $this->name = null;
   }
-
-  private function isIdFree( $name ) {
-    return!file_exists( $this->getSessionFilename( $name ) );
-  }
-
-  private function validateSessionFile() {
-    $dir = $this->options['save_path'];
-
-    $file = $dir . '/' . $this->name . '.session';
-
-    if( file_exists( $file ) and !is_writable( $file ) )
-        throw new RuntimeException( 'Noe enough rights to write to "' . $file . '"' );
-  }
-
-  private function getSessionFilename( $name = null ) {
-    if( null === $name ) $name = $this->name;
-
-    return $this->options['save_path'] . '/' . $name . '.session';
-  }
-
-  private function lock() {
-    $file = $this->getSessionFilename();
-
-    if( file_exists( $file ) ) $this->_fp = @fopen( $file, 'r+' );
-    else $this->_fp = @fopen( $file, 'w' );
-
-    if( false === $this->_fp ) {
-      $this->_fp = null;
-      throw new RuntimeException( 'Could not open "' . $this->getSessionFilename() . '" file for read&write' );
-    }
-
-    flock( $this->_fp, LOCK_EX );
-    return true;
-  }
-
-  private function unlock() {
-    fclose( $this->_fp );
-    $this->_fp = null;
-  }
-
-  private function readData() {
-    $this->vars = self::unserialize( file_get_contents( $this->getSessionFilename() ) );
-  }
-
-  private function flushData() {
-    file_put_contents( $this->getSessionFilename(), self::serialize( $this->vars ) );
-  }
-
-  private static function serialize( array $data ) {
-    $container = array(
-      'magic' => self::MAGIC,
-      'data' => $data
+  
+  public function gc( $maxLifeTime ) {
+    array_map(
+      function( $path ) {
+        if( filemtime( $path ) > $maxLifeTime ) {
+          unlink( $path );
+        }
+      },
+      glob( $this->_op['save_path'] . DIRECTORY_SEPARATOR . sprintf(
+        $this->_options['filename_pattern'], '*' ) )
     );
-
-    return \serialize( $container );
   }
-
-  private static function unserialize( $string ) {
-    $result = @\unserialize( $string );
-
-    if( !is_array( $result )
-      or !array_key_exists( 'magic', $result ) or !array_key_exists( 'data',
-        $result )
-      or $result['magic'] !== self::MAGIC or !is_array( $result['data'] )
-    ) {
-      throw new UnexpectedValueException( 'not a valid session' );
+  
+  /**
+   * Get the full path to the file containing the session data.
+   *
+   * @return string
+   */
+  public function getSessionFilename() {
+    if( is_null( $this->_id ) ) {
+      trigger_error( 'Session not started' );
+      return null;
+    } else {
+      return $this->_options['save_path'] . DIRECTORY_SEPARATOR . sprintf(
+        $this->_options['filename_pattern'], $this->_id );
     }
-
-    return $result['data'];
+  }
+  
+  /**
+   * Write out the session data to disk.
+   */
+  protected function _flush() {
+    fwrite( $this->_handle, $this->_serialize( $this->_data ) );
+    fflush( $this->_handle );
+  }
+  
+  /**
+   * Lock the session data file.
+   */
+  protected function _lock() {
+    if( $this->_handle = fopen( $this->getSessionFilename(), 'c+b' ) ) {
+      flock( $this->_handle, LOCK_EX );
+    } else {
+      throw new RuntimeException( 'Unable to open session file: ' .
+        $this->getSessionFilename() );
+    }
+  }
+  
+  /**
+   * Unlock the session data file.
+   */
+  protected function _unlock() {
+    fclose( $this->_handle );
+    $this->_handle = null;
+  }
+  
+  protected function _getDefaultOptions() {
+    $savePath = empty( realpath( ini_get( 'session.save_path' ) ) ) ?
+      '/tmp' : realpath( ini_get( 'session.save_path' ) );
+    return array(
+      'save_path'         => $savePath,
+      'filename_pattern'  => 'sess_%s',
+      'maxlifetime'       => ini_get( 'session.gc_maxlifetime' )
+    );
+  }
+  
+  protected function _isIdFree( $id ) {
+    return !file_exists( $this->_options['save_path'] . DIRECTORY_SEPARATOR .
+      sprintf( $this->_options['filename_pattern'], $id ) );
   }
 }

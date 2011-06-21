@@ -60,6 +60,13 @@ class Engine implements \ArrayAccess {
    * @var Storage
    */
   private $_storage = null;
+  
+  /**
+   * The session name. PHP default is PHPSESSID
+   * 
+   * @var string
+   */
+  private $_name = null;
 
   /**
    * Setup this session engine with the current context.
@@ -138,6 +145,20 @@ class Engine implements \ArrayAccess {
   }
   
   /**
+   * Test method to work around Magento dumbness.
+   *
+   * @param string $key
+   * @return mixed
+   */
+  public function &getRef( $key ) {
+    if( isset( $this->_vars[$key] ) ) {
+      return $this->_vars[$key];
+    } else {
+      return null;
+    }
+  }
+  
+  /**
    * Check if the session has been started.
    *
    * @return bool
@@ -173,6 +194,16 @@ class Engine implements \ArrayAccess {
     }
   }
   
+  public function getName() {
+    return $this->_name;
+  }
+  
+  public function setName( $name ) {
+    $this->_ensureNotStarted();
+    $this->_name = $name;
+    $this->_options['cookie_name'] = $name;
+  }
+  
   /**
    * Set the session options.
    *
@@ -180,7 +211,8 @@ class Engine implements \ArrayAccess {
    */
   public function setOptions( array $options ) {
     $this->_ensureNotStarted();
-    $this->_options = array_merge( $this->_getDefaultOptions(), $options );
+    $this->_options = array_merge( $this->_getDefaultOptions(),
+      $this->_options, $options );
   }
   
   /**
@@ -192,8 +224,6 @@ class Engine implements \ArrayAccess {
   public function setSaveHandler( Storage $storageEngine ) {
     $this->_ensureNotStarted();
     $this->_handler = $storageEngine;
-    $this->_handler->open( $this->_options['storage_save_path'],
-      $this->_options['cookie_name'] );
   }
 
   /**
@@ -207,10 +237,10 @@ class Engine implements \ArrayAccess {
         $this->setSaveHandler( $this->_getDefaultSaveHandler() );
       }
       if( $this->_cookieIsSet() ) {
-        $this->setId( $this->_getIdFromCookie() );
-        $this->_vars = unserialize( $this->_storage->read( $this->getId() ) );
+        $this->setId( $this->_storage->open( $this->_getIdFromCookie() ) );
+        $this->_vars = $this->_storage->read();
       } else {
-        $this->setId( $this->_storage->getFreeId() );
+        $this->setId( $this->_storage->create() );
         $this->_createIdCookie();
       }
       $this->_isStarted = true;
@@ -229,7 +259,7 @@ class Engine implements \ArrayAccess {
    */
   public function writeClose() {
     $this->_ensureStarted();
-    $this->_storage->write( $this->getId(), serialize( $this->_vars ) );
+    $this->_storage->write( $this->_vars );
     $this->_reset();
   }
 
@@ -238,7 +268,7 @@ class Engine implements \ArrayAccess {
    */
   public function destroy() {
     $this->_ensureStarted();
-    $this->_storage->destroy( $this->getId() );
+    $this->_storage->destroy();
     $this->_dropIdCookie();
     $this->_reset();
   }
@@ -446,6 +476,6 @@ class Engine implements \ArrayAccess {
    * @return Storage\FileStorage 
    */
   final protected function _getDefaultSaveHandler() {
-    return new Storage\FileStorage( array() );
+    return new Storage\FileStorage();
   }
 }
