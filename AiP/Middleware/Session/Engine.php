@@ -185,7 +185,7 @@ class Engine implements \ArrayAccess {
    */
   public function setSaveHandler( Storage $storageEngine ) {
     $this->_ensureNotStarted();
-    $this->_handler = $storageEngine;
+    $this->_storage = $storageEngine;
   }
 
   /**
