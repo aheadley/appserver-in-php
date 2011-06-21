@@ -200,7 +200,10 @@ class Engine implements \ArrayAccess {
         // Save handler wasn't set, use the default.
         $this->setSaveHandler( $this->_getDefaultSaveHandler() );
       }
-      if( $this->_cookieIsSet() ) {
+      if( $this->getId() !== '' ) {
+        $this->_storage->open( $this->getId() );
+        $this->_vars = $this->_storage->read();
+      } elseif( $this->_cookieIsSet() ) {
         $this->setId( $this->_storage->open( $this->_getIdFromCookie() ) );
         $this->_vars = $this->_storage->read();
       } else {

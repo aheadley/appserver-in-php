@@ -14,6 +14,9 @@ class FileStorage extends AbstractStorage {
       if( file_exists( $this->getSessionFilename() ) ) {
         $this->_data = $this->_unserialize( file_get_contents(
           $this->getSessionFilename() ) );
+        if( !is_array( $this->_data ) ) {
+          $this->_data = array();
+        }
       } else {
         $this->_data = array();
       }
