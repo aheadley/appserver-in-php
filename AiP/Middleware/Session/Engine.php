@@ -88,7 +88,9 @@ class Engine implements \ArrayAccess {
   public function offsetGet( $offset ) {
     $this->_ensureStarted();
     if( !array_key_exists( $offset, $this->_vars ) ) {
-      trigger_error( sprintf( 'Undefined offset: %s in %s at line %d', $offset, __FILE__, __LINE__ ) );
+      $trace = debug_backtrace();
+      trigger_error( sprintf( 'Undefined offset: %s in %s at line %d', $offset,
+        $trace[1]['file'], $trace[1]['line'] ) );
       return null;
     } else {
       return $this->_vars[$offset];
@@ -240,8 +242,7 @@ class Engine implements \ArrayAccess {
    *
    * @return array
    */
-  public function getSessionCookieHeaders() {
-    //$this->_ensureStarted();
+  public function getCookieHeader() {
     return $this->_headers;
   }
   
@@ -280,8 +281,9 @@ class Engine implements \ArrayAccess {
    */
   protected function _ensureStarted() {
     if( !$this->isStarted() ) {
-file_put_contents('trace.log', print_r( debug_backtrace(), true ) );
-      throw new LogicException( 'Session has not been started' );
+      $trace = debug_backtrace();
+      throw new LogicException( sprintf( 'Session has not been started in %s on line %d',
+        $trace[1]['file'], $trace[1]['line'] ) );
     }
   }
   
@@ -292,7 +294,9 @@ file_put_contents('trace.log', print_r( debug_backtrace(), true ) );
    */
   protected function _ensureNotStarted() {
     if( $this->isStarted() ) {
-      throw new LogicException( 'Session has already been started' );
+      $trace = debug_backtrace();
+      throw new LogicException( sprintf( 'Session has already been started in %s on line %d',
+        $trace[1]['file'], $trace[1]['line'] ) );
     }
   }
   

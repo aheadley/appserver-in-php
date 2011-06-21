@@ -77,7 +77,7 @@ class EngineDump extends PHPUnit_Framework_TestCase
             $this->assertTrue(true);
         }
 
-        $headers = $sess->getSessionCookieHeaders();
+        $headers = $sess->getCookieHeader();
 
         $this->assertEquals(2, count($headers));
         $this->assertEquals('Set-Cookie', $headers[0]);
@@ -108,7 +108,7 @@ class EngineDump extends PHPUnit_Framework_TestCase
             $this->assertTrue(true);
         }
 
-        $headers = $sess->getSessionCookieHeaders();
+        $headers = $sess->getCookieHeader();
 
         $this->assertEquals(4, count($headers));
         $this->assertEquals('Set-Cookie', $headers[0]);

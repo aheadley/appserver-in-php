@@ -34,7 +34,7 @@ class Session {
     $result = call_user_func( $this->_app, $context );
     try {
       // Add in the session ID cookie headers
-      $result[1] = array_merge( $result[1], $session->getSessionCookieHeaders() );
+      $result[1] = array_merge( $result[1], $session->getCookieHeader() );
     } catch( LogicException $e ) { /* no session, don't care */ }
     return $result;
   }
