@@ -46,6 +46,7 @@ class FileStorage extends AbstractStorage {
   public function write( array $sessionData ) {
     $this->_ensureOpen( true );
     $this->_data = $sessionData;
+    $this->_flush();
   }
   
   public function destroy() {
