@@ -79,6 +79,12 @@ class Engine implements \ArrayAccess {
     }
     $this->setOptions( array() );
   }
+  
+  public function __destruct() {
+    if( !is_null( $this->_storage ) ) {
+      $this->_storage->close();
+    }
+  }
 
   public function offsetExists( $offset ) {
     $this->_ensureStarted();
