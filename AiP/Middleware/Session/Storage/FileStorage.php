@@ -7,11 +7,10 @@ class FileStorage extends AbstractStorage {
   protected function _read( $id ) {
     $filename = $this->_getFilename( $id );
     if( file_exists( $filename ) ) {
-      $handle = fopen( $filename, 'rb' );
-      flock( $handle, LOCK_SH );
-      $data = file_get_contents( $filename );
-      flock( $handle, LOCK_UN );
-      fclose( $handle );
+      if( $data = file_get_contents( $filename ) === false ) {
+        throw new RuntimeException( 'Unable to read session data file: ' .
+          $filename );
+      }
     } else {
       $data = '';
     }
@@ -24,11 +23,10 @@ class FileStorage extends AbstractStorage {
       throw new RuntimeException( 'Unable to create session data file: ' .
         $filename );
     }
-    $handle = fopen( $filename, 'wb' );
-    flock( $handle, LOCK_EX );
-    file_put_contents( $filename, (string)$data );
-    flock( $handle, LOCK_UN );
-    fclose( $handle );
+    if( file_put_contents( $filename, (string)$data ) === false ) {
+      throw new RuntimeException( 'Unable to write to session data file: ' .
+        $filename );
+    }
   }
   
   public function destroy( $id ) {
