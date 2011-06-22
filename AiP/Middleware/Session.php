@@ -33,10 +33,9 @@ class Session {
     $session = $context[self::CONTEXT_KEY] = new Session\Engine( $context );
     $result = call_user_func( $this->_app, $context );
     try {
-      // Add in the session ID cookie headers
       $result[1] = array_merge( $result[1], $session->getCookieHeader() );
       $session->writeClose();
-    } catch( LogicException $e ) { /* no session, don't care */ }
+    } catch( \AiP\Middleware\Session\LogicException $e ) {/* don't care */}
     return $result;
   }
 }

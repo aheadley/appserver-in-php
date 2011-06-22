@@ -18,42 +18,29 @@ interface Storage {
   public function create();
   
   /**
-   * Open the engine (prepare for session writing). Returns the session id it
-   * opened.
-   * 
-   * @param string $sessionId
-   * @return string
-   */
-  public function open( $sessionId );
-  
-  /**
-   * Close the engine (no more session writing?)
-   * 
-   * @return bool
-   */
-  public function close();
-  
-  /**
    * Read the session data for an ID
    * 
+   * @param string $id
    * @return string
    */
-  public function read();
+  public function read( $id );
   
   /**
    * Write the session data for an ID
    * 
-   * @param array $sessionData
+   * @param string $id
+   * @param array $data
    * @return bool
    */
-  public function write( array $sessionData );
+  public function write( $id, array $data );
   
   /**
    * Delete the session data for an ID
    * 
+   * @param string $id
    * @return bool
    */
-  public function destroy();
+  public function destroy( $id );
   
   /**
    * Collect garbage sessions (with a lifetime greater than $maxLifeTime).
@@ -61,11 +48,4 @@ interface Storage {
    * @param int $maxLifeTime
    */
   public function gc( $maxLifeTime );
-  
-  /**
-   * Check if we've been open()'d
-   * 
-   * @return bool
-   */
-  public function isOpen();
 }

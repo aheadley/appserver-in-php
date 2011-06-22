@@ -4,56 +4,36 @@ namespace AiP\Middleware\Session\Storage;
 
 class FileStorage extends AbstractStorage {
   
-  protected $_handle    = null;
-  
-  public function open( $sessionId ) {
-    $this->_ensureClosed( true );
-    if( $this->_validateId( $sessionId ) ) {
-      $this->_id = $sessionId;
-      $this->_lock();
-      if( file_exists( $this->getSessionFilename() ) ) {
-        $this->_data = $this->_unserialize( file_get_contents(
-          $this->getSessionFilename() ) );
-        if( !is_array( $this->_data ) ) {
-          $this->_data = array();
-        }
-      } else {
-        $this->_data = array();
-      }
-      return $this->_id;
+  protected function _read( $id ) {
+    $filename = $this->_getFilename( $id );
+    if( file_exists( $filename ) ) {
+      $handle = fopen( $filename, 'rb' );
+      flock( $handle, LOCK_SH );
+      $data = file_get_contents( $filename );
+      flock( $handle, LOCK_UN );
+      fclose( $handle );
     } else {
-      throw new UnexpectedValueException( 'Invalid session id: ' . $sessionId );
+      $data = '';
     }
+    return $data;
   }
   
-  public function isOpen() {
-    return !is_null( $this->_id );
-  }
-  
-  public function close() {
-    if( $this->isOpen() ) {
-      $this->_flush();
-      $this->_unlock();
-      $this->_id = null;
+  protected function _write( $id, $data ) {
+    $filename = $this->_getFilename( $id );
+    if( !file_exists( $filename ) && !touch( $filename ) ) {
+      throw new RuntimeException( 'Unable to create session data file: ' .
+        $filename );
     }
+    $handle = fopen( $filename, 'wb' );
+    flock( $handle, LOCK_EX );
+    file_put_contents( $filename, (string)$data );
+    flock( $handle, LOCK_UN );
+    fclose( $handle );
   }
   
-  public function read() {
-    $this->_ensureOpen( true );
-    return $this->_data;
-  }
-  
-  public function write( array $sessionData ) {
-    $this->_ensureOpen( true );
-    $this->_data = $sessionData;
-    $this->_flush();
-  }
-  
-  public function destroy() {
-    if( $this->isOpen() ) {
-      $this->_unlock();
-      unlink( $this->getSessionFilename() );
-      $this->_id = null;
+  public function destroy( $id ) {
+    if( !unlink( $this->_getFilename( $id ) ) ) {
+      trigger_error( 'Unable to destroy session data for ID: ' . $id );
     }
   }
   
@@ -64,7 +44,7 @@ class FileStorage extends AbstractStorage {
           unlink( $path );
         }
       },
-      glob( $this->_op['save_path'] . DIRECTORY_SEPARATOR . sprintf(
+      glob( $this->_options['save_path'] . DIRECTORY_SEPARATOR . sprintf(
         $this->_options['filename_pattern'], '*' ) )
     );
   }
@@ -74,42 +54,13 @@ class FileStorage extends AbstractStorage {
    *
    * @return string
    */
-  public function getSessionFilename() {
-    if( is_null( $this->_id ) ) {
-      trigger_error( 'Session not started' );
-      return null;
+  protected function _getFilename( $id ) {
+    if( !$this->_validateId( $id ) ) {
+      throw new UnexpectedValueException( 'Invalid session ID: ' . $id );
     } else {
       return $this->_options['save_path'] . DIRECTORY_SEPARATOR . sprintf(
-        $this->_options['filename_pattern'], $this->_id );
+        $this->_options['filename_pattern'], $id );
     }
-  }
-  
-  /**
-   * Write out the session data to disk.
-   */
-  protected function _flush() {
-    fwrite( $this->_handle, $this->_serialize( $this->_data ) );
-    fflush( $this->_handle );
-  }
-  
-  /**
-   * Lock the session data file.
-   */
-  protected function _lock() {
-    if( $this->_handle = fopen( $this->getSessionFilename(), 'c+b' ) ) {
-      flock( $this->_handle, LOCK_EX );
-    } else {
-      throw new RuntimeException( 'Unable to open session file: ' .
-        $this->getSessionFilename() );
-    }
-  }
-  
-  /**
-   * Unlock the session data file.
-   */
-  protected function _unlock() {
-    fclose( $this->_handle );
-    $this->_handle = null;
   }
   
   protected function _getDefaultOptions() {
@@ -126,7 +77,6 @@ class FileStorage extends AbstractStorage {
   }
   
   protected function _isIdFree( $id ) {
-    return !file_exists( $this->_options['save_path'] . DIRECTORY_SEPARATOR .
-      sprintf( $this->_options['filename_pattern'], $id ) );
+    return !file_exists( $this->_getFilename( $id ) );
   }
 }

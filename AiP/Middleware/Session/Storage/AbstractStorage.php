@@ -31,8 +31,6 @@ namespace AiP\Middleware\Session\Storage;
 
 abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
   
-  protected $_data        = array();
-  protected $_id          = null;
   protected $_options     = null;
   
   /**
@@ -45,15 +43,42 @@ abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
     $this->_options = array_merge( $this->_getDefaultOptions(), $options );
   }
   
-  /**
-   * Need to make sure the session data gets saved.
-   */
-  public function __destruct() {
-    $this->close();
+  public function read( $id ) {
+    if( !$this->_validateId( $id ) ) {
+      throw new UnexpectedValueException( 'Invalid session id: ' . $id );
+    } else {
+      $data = $this->_read( $id );
+      if( empty( $data ) ) {
+        return array();
+      } else {
+        $data = $this->_unserialize( $data );
+        if( !is_array( $data ) ) {
+          trigger_error( 'Error unserializing session data for ID: ' . $id );
+          return array();
+        } else {
+          return $data;
+        }
+      }
+    }
+  }
+  
+  public function write( $id, array $data ) {
+    if( !$this->_validateId( $id ) ) {
+      throw new UnexpectedValueException( 'Invalid session id: ' . $id );
+    } else {
+      $data = $this->_serialize( $data );
+      if( !is_string( $data ) ) {
+        trigger_error( 'Error serializing session data for ID: ' . $id );
+      } elseif( !empty( $data ) ) {
+        $this->_write( $id, $data );
+      }
+    }
   }
   
   public function create() {
-    return $this->open( $this->_getFreeId() );
+    $newId = $this->_getFreeId();
+    $this->read( $newId );
+    return $newId;
   }
   
   /**
@@ -70,6 +95,10 @@ abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
    * @return bool
    */
   abstract protected function _isIdFree( $id );
+  
+  abstract protected function _read( $id );
+  
+  abstract protected function _write( $id, $data );
   
   /**
    * Make sure a session id is valid
@@ -90,11 +119,6 @@ abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
    */
   protected function _serialize( array $data ) {
     return serialize( $data );
-    $oldSession = $_SESSION;
-    $_SESSION = $data;
-    $dataString = session_encode();
-    $_SESSION = $oldSession;
-    return $dataString;
   }
   
   /**
@@ -105,17 +129,6 @@ abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
    */
   protected function _unserialize( $dataString ) {
     return unserialize( $dataString );
-    $oldSession = $_SESSION;
-    $_SESSION = array(); //make sure we have a clean slate
-    if( !session_decode( $dataString ) ) {
-      trigger_error( sprintf( 'Unable to unserialize string in %s on line %d',
-        __FILE__, __LINE__ ) );
-      return array();
-    } else {
-      $data = $_SESSION;
-      $_SESSION = $oldSession;
-      return $data;
-    }
   }
   
   /**
@@ -139,40 +152,6 @@ abstract class AbstractStorage implements \AiP\Middleware\Session\Storage {
     while( $id = $this->_generateId() ) {
       if( $this->_isIdFree( $id ) ) {
         return $id;
-      }
-    }
-  }
-  
-  /**
-   * Check that the session has already been started, optionally throw
-   * an exception if it hasn't, otherwise just trigger an error message.
-   *
-   * @param bool $throwException 
-   * @throws LogicException
-   */
-  final protected function _ensureOpen( $throwException = false ) {
-    if( !$this->isOpen() ) {
-      if( $throwException ) {
-        throw new LogicException( 'Session not started' );
-      } else {
-        trigger_error( 'Session not started' );
-      }
-    }
-  }
-  
-  /**
-   * Check that the session hasn't already been started, optionally throw
-   * an exception if it has, otherwise just trigger an error message.
-   *
-   * @param bool $throwException 
-   * @throws LogicException
-   */
-  final protected function _ensureClosed( $throwException = false ) {
-    if( $this->isOpen() ) {
-      if( $throwException ) {
-        throw new LogicException( 'Session already started' );
-      } else {
-        trigger_error( 'Session already started' );
       }
     }
   }

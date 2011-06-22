@@ -52,7 +52,7 @@ class Engine implements \ArrayAccess {
    *
    * @var array
    */
-  private $_vars = array();
+  private $_data = array();
   
   /**
    * The storage engine backing this session engine.
@@ -80,38 +80,32 @@ class Engine implements \ArrayAccess {
     $this->setOptions( array() );
   }
   
-  public function __destruct() {
-    if( !is_null( $this->_storage ) ) {
-      $this->_storage->close();
-    }
-  }
-
   public function offsetExists( $offset ) {
     $this->_ensureStarted();
-    return array_key_exists( $offset, $this->_vars );
+    return array_key_exists( $offset, $this->_data );
   }
   
   public function offsetGet( $offset ) {
     $this->_ensureStarted();
-    if( !array_key_exists( $offset, $this->_vars ) ) {
+    if( !array_key_exists( $offset, $this->_data ) ) {
       $trace = debug_backtrace();
       trigger_error( sprintf( 'Undefined offset: %s in %s at line %d', $offset,
         $trace[1]['file'], $trace[1]['line'] ) );
       return null;
     } else {
-      return $this->_vars[$offset];
+      return $this->_data[$offset];
     }
     return $this->__get( $offset );
   }
   
   public function offsetSet( $offset, $value ) {
     $this->_ensureStarted();
-    $this->_vars[$offset] = $value;
+    $this->_data[$offset] = $value;
   }
   
   public function offsetUnset( $offset ) {
     $this->_ensureStarted();
-    unset( $this->_vars[$offset] );
+    unset( $this->_data[$offset] );
   }
   
   /**
@@ -121,8 +115,8 @@ class Engine implements \ArrayAccess {
    * @return mixed
    */
   public function &getRef( $key ) {
-    if( isset( $this->_vars[$key] ) ) {
-      return $this->_vars[$key];
+    if( isset( $this->_data[$key] ) ) {
+      return $this->_data[$key];
     } else {
       return null;
     }
@@ -207,16 +201,17 @@ class Engine implements \ArrayAccess {
         $this->setSaveHandler( $this->_getDefaultSaveHandler() );
       }
       if( $this->getId() !== '' ) {
-        $this->_storage->open( $this->getId() );
-        $this->_vars = $this->_storage->read();
+        $this->_data = $this->_storage->read( $this->getId() );
       } elseif( $this->_cookieIsSet() ) {
-        $this->setId( $this->_storage->open( $this->_getIdFromCookie() ) );
-        $this->_vars = $this->_storage->read();
+        $this->setId( $this->_getIdFromCookie() );
+        $this->_data = $this->_storage->read( $this->getId() );
       } else {
         $this->setId( $this->_storage->create() );
         $this->_createIdCookie();
       }
       $this->_isStarted = true;
+    } else {
+      trigger_error( 'Session already started' );
     }
   }
 
@@ -232,7 +227,7 @@ class Engine implements \ArrayAccess {
    */
   public function writeClose() {
     $this->_ensureStarted();
-    $this->_storage->write( $this->_vars );
+    $this->_storage->write( $this->getId(), $this->_data );
     $this->_reset();
   }
 
@@ -241,7 +236,7 @@ class Engine implements \ArrayAccess {
    */
   public function destroy() {
     $this->_ensureStarted();
-    $this->_storage->destroy();
+    $this->_storage->destroy( $this->getId() );
     $this->_dropIdCookie();
     $this->_reset();
   }
@@ -268,18 +263,15 @@ class Engine implements \ArrayAccess {
   /**
    * Reset the session engine, used after closing a session.
    */
-  private function _reset( $keepHandler = false ) {
+  private function _reset( $keepStorage = false ) {
     $this->_id = null;
-    $this->_vars = array();
+    $this->_data = array();
     if( !$keepHandler ) {
-      if( !is_null( $this->_storage ) ) {
-        $this->_storage->close();
-      }
       $this->_storage = null;
     }
     $this->_headers = array();
     $this->_isStarted = false;
-    $this->setOptions( array() );
+    $this->_options = $this->_getDefaultOptions();
   }
 
   /**
@@ -291,8 +283,9 @@ class Engine implements \ArrayAccess {
   protected function _ensureStarted() {
     if( !$this->isStarted() ) {
       $trace = debug_backtrace();
-      throw new LogicException( sprintf( 'Session has not been started in %s on line %d',
-        $trace[1]['file'], $trace[1]['line'] ) );
+      throw new LogicException( sprintf(
+        'Session has not been started in %s on line %d', $trace[1]['file'],
+        $trace[1]['line'] ) );
     }
   }
   
@@ -304,8 +297,9 @@ class Engine implements \ArrayAccess {
   protected function _ensureNotStarted() {
     if( $this->isStarted() ) {
       $trace = debug_backtrace();
-      throw new LogicException( sprintf( 'Session has already been started in %s on line %d',
-        $trace[1]['file'], $trace[1]['line'] ) );
+      throw new LogicException( sprintf(
+        'Session has already been started in %s on line %d', $trace[1]['file'],
+        $trace[1]['line'] ) );
     }
   }
   
