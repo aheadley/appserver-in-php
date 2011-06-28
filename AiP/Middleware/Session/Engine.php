@@ -218,7 +218,10 @@ class Engine implements \ArrayAccess {
    * Alias of writeClose()
    */
   public function commit() {
-    $this->writeClose();
+    $this->_ensureStarted();
+    $this->_storage->write( $this->_vars );
+    $this->_storage->close();
+    //$this->writeClose();
   }
   
   /**
@@ -227,6 +230,7 @@ class Engine implements \ArrayAccess {
   public function writeClose() {
     $this->_ensureStarted();
     $this->_storage->write( $this->_vars );
+    $this->_storage->close();
     $this->_reset();
   }
 

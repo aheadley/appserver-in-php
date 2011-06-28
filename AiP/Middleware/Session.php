@@ -35,7 +35,8 @@ class Session {
     try {
       // Add in the session ID cookie headers
       $result[1] = array_merge( $result[1], $session->getCookieHeader() );
-    } catch( LogicException $e ) { /* no session, don't care */ }
+      $session->commit();
+    } catch( Session\LogicException $e ) { /* no session, don't care */ }
     return $result;
   }
 }

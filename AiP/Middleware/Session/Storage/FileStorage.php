@@ -46,6 +46,7 @@ class FileStorage extends AbstractStorage {
   public function write( array $sessionData ) {
     $this->_ensureOpen( true );
     $this->_data = $sessionData;
+    $this->_flush();
   }
   
   public function destroy() {
@@ -107,6 +108,7 @@ class FileStorage extends AbstractStorage {
    * Unlock the session data file.
    */
   protected function _unlock() {
+    flock( $this->_handle, LOCK_UN );
     fclose( $this->_handle );
     $this->_handle = null;
   }
