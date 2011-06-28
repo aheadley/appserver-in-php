@@ -36,7 +36,9 @@ class Session {
       // Add in the session ID cookie headers
       $result[1] = array_merge( $result[1], $session->getCookieHeader() );
       $session->commit();
-    } catch( Session\LogicException $e ) { /* no session, don't care */ }
+    } catch( Session\LogicException $e ) {
+      trigger_error( 'Session error: ' . $e->getMessage() );
+    }
     return $result;
   }
 }

@@ -15,6 +15,7 @@ class FileStorage extends AbstractStorage {
         $this->_data = $this->_unserialize( file_get_contents(
           $this->getSessionFilename() ) );
         if( !is_array( $this->_data ) ) {
+          throw new UnexpectedValueException( 'Session data file was empty' );
           $this->_data = array();
         }
       } else {

@@ -137,11 +137,7 @@ class Engine implements \ArrayAccess {
    * @return string
    */
   public function getId() {
-    if( is_null( $this->_id ) ) {
-      return '';
-    } else {
-      return $this->_id;
-    }
+    return is_null( $this->_id ) ? '' : $this->_id;
   }
   
   /**
