@@ -361,11 +361,10 @@ class Engine implements \ArrayAccess {
    * @param array $context 
    */
   protected function _parseContext( array $context ) {
-    if( (bool)ini_get( 'session.use_cookies' ) ) {
-      if( isset( $context['_COOKIE'] ) &&
-          isset( $context['_COOKIE'][$this->getName()] ) ) {
-        $this->setId( $context['_COOKIE'][$this->getName()] );
-      }
+    if( (bool)ini_get( 'session.use_cookies' ) &&
+        isset( $context['_COOKIE'] ) &&
+        isset( $context['_COOKIE'][$this->getName()] ) ) {
+      $this->setId( $context['_COOKIE'][$this->getName()] );
     }
     if( !(bool)ini_get( 'session.use_only_cookies' ) &&
         isset( $context['_GET'][$this->getName()] ) ) {
