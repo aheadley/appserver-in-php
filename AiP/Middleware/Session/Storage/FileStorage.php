@@ -35,6 +35,7 @@ class FileStorage extends AbstractStorage {
     if( $this->isOpen() ) {
       $this->_flush();
       $this->_unlock();
+      $this->_data = array();
       $this->_id = null;
     }
   }
@@ -71,9 +72,9 @@ class FileStorage extends AbstractStorage {
   
   public function destroy() {
     if( $this->isOpen() ) {
-      $this->_unlock();
-      unlink( $this->getSessionFilename() );
-      $this->_id = null;
+      $sessionFile = $this->getSessionFilename();
+      $this->close();
+      unlink( $sessionFile );
     }
   }
   

@@ -85,7 +85,7 @@ class Cookies implements \ArrayAccess {
    * @return bool true if the string doesn't contain any invalid characters
    */
   protected static function _validateCookieString( $str ) {
-    return !(bool)strpbrk( $name, "=,; \t\r\n\013\014" );
+    return !(bool)strpbrk( $str, "=,; \t\r\n\013\014" );
   }
 
   /**
