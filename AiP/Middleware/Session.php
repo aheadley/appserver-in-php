@@ -32,11 +32,11 @@ class Session {
     }
     $session = $context[self::CONTEXT_KEY] = new Session\Engine( $context );
     $result = call_user_func( $this->_app, $context );
-    // Add in the session ID cookie headers
-    $result[1] = array_merge( $result[1], $session->getCookieHeader() );
     if( $session->isStarted() ) {
       $session->writeClose();
     }
+    // Add in the session ID cookie headers
+    $result[1] = array_merge( $result[1], $session->getCookieHeader() );
     return $result;
   }
 }
