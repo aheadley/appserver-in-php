@@ -223,7 +223,6 @@ class Engine implements \ArrayAccess {
         //this is assuming we use cookies for the SID which is usually true but
         // doesn't have to be, should be fixed at some point to handle SID in GET
         var_dump( 'SESSION CREATED NEW' );
-        file_put_contents( 'debug.txt', print_r( debug_backtrace(), true ) );
       }
       $this->_isStarted = true;
     }
@@ -286,7 +285,7 @@ class Engine implements \ArrayAccess {
     }
     $this->_storage = null;
     $this->_options = $this->_getDefaultOptions();
-    $this->_cookieJar = new \AiP\Middleware\HTTPParser\Cookies();
+    $this->_cookieJar = null;
     $this->_isStarted = false;
   }
 
@@ -363,6 +362,7 @@ class Engine implements \ArrayAccess {
    * @param array $context 
    */
   protected function _parseContext( array $context ) {
+    $this->_cookieJar = $context['_COOKIE'];
     if( (bool)ini_get( 'session.use_cookies' ) &&
         isset( $context['_COOKIE'] ) &&
         isset( $context['_COOKIE'][$this->getName()] ) ) {
