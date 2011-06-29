@@ -160,7 +160,6 @@ class Engine implements \ArrayAccess {
     }
     $this->_id = $this->_storage->create();
     $this->_storage->write( $this->_data );
-    $this->_createIdCookie();
   }
   
   /**
@@ -220,9 +219,6 @@ class Engine implements \ArrayAccess {
         $this->_data = $this->_storage->read();
       } else {
         $this->setId( $this->_storage->create() );
-        //this is assuming we use cookies for the SID which is usually true but
-        // doesn't have to be, should be fixed at some point to handle SID in GET
-        var_dump( 'SESSION CREATED NEW' );
       }
       $this->_isStarted = true;
     }
