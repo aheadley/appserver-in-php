@@ -216,11 +216,13 @@ class Engine implements \ArrayAccess {
       if( $this->getId() !== '' ) {
         $this->_storage->open( $this->getId() );
         $this->_data = $this->_storage->read();
+        $this->_createIdCookie();
       } else {
         $this->setId( $this->_storage->create() );
         //this is assuming we use cookies for the SID which is usually true but
         // doesn't have to be, should be fixed at some point to handle SID in GET
         $this->_createIdCookie();
+        var_dump( 'SESSION CREATED NEW' );
       }
       $this->_isStarted = true;
     }
