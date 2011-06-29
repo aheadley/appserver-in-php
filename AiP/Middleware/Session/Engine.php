@@ -148,6 +148,20 @@ class Engine implements \ArrayAccess {
     }
   }
   
+  public function regenerateId( $deleteOld = false ) {
+    $this->_ensureStarted();
+    $oldId = $this->getId();
+    $oldData = $this->_data;
+    if( $deleteOld ) {
+      $this->_storage->destroy();
+    } else {
+      $this->_storage->write( $this->_data );
+      $this->_storage->close();
+    }
+    $this->setId( $this->_storage->create() );
+    $this->_createIdCookie();
+  }
+  
   /**
    * Get the name of the session. This is the token that identifies the SID,
    * default is PHPSESSID
