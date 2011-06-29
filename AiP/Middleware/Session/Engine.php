@@ -59,6 +59,8 @@ class Engine implements \ArrayAccess {
    * @var string
    */
   private $_name = null;
+  
+  private $_context = array();
 
   /**
    * Setup this session engine with the current context.
@@ -67,7 +69,7 @@ class Engine implements \ArrayAccess {
    */
   public function __construct( array $context ) {
     $this->_reset();
-    $this->_parseContext( $context );
+    $this->_context = $context;
     if( (bool)ini_get( 'session.auto_start' ) ) {
       $this->start();
     }
@@ -213,6 +215,7 @@ class Engine implements \ArrayAccess {
         // Save handler wasn't set, use the default.
         $this->setSaveHandler( $this->_getDefaultSaveHandler() );
       }
+      $this->_parseContext( $this->_context );
       if( $this->getId() !== '' ) {
         $this->_storage->open( $this->getId() );
         $this->_data = $this->_storage->read();
