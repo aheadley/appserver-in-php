@@ -58,23 +58,56 @@ class Cookies implements \ArrayAccess {
     throw new LogicException();
   }
 
-  public function _getHeaders() {
+  /**
+   * Get the set-cookie headers
+   *
+   * @return array
+   */
+  public function getHeaders() {
     return $this->_headers;
   }
 
+  /**
+   * Add some headers as a name/value pair
+   *
+   * @param string $name
+   * @param string $value
+   */
   private function _addHeader( $name, $value ) {
     $this->_headers[] = $name;
     $this->_headers[] = $value;
   }
 
-  // This one almost directly copies php_setcookie() function from php-core
+  /**
+   * Check if a cookie name or value is valid.
+   *
+   * @param string $str
+   * @return bool true if the string doesn't contain any invalid characters
+   */
+  protected static function _validateCookieString( $str ) {
+    return !(bool)strpbrk( $name, "=,; \t\r\n\013\014" );
+  }
+
+  /**
+   * Create the a cookie header value string. This one almost directly copies
+   * php_setcookie() function from php-core
+   *
+   * @param type $name
+   * @param type $value
+   * @param type $expire
+   * @param type $path
+   * @param type $domain
+   * @param type $secure
+   * @param type $httponly
+   * @return string 
+   */
   private static function _cookieHeaderValue( $name, $value, $expire, $path,
     $domain, $secure, $httponly, $raw ) {
-    if( false !== strpbrk( $name, "=,; \t\r\n\013\014" ) ) {
+    if( !self::_validateCookieString( $name ) ) {
       throw new UnexpectedValueException( "Cookie names can not contain any of the following: '=,; \\t\\r\\n\\013\\014'" );
     }
 
-    if( true === $raw && false !== strpbrk( $value, ",; \t\r\n\013\014" ) ) {
+    if( true === $raw && !self::_validateCookieString( $value ) ) {
       throw new UnexpectedValueException( "Cookie values can not contain any of the following: ',; \\t\\r\\n\\013\\014'" );
     }
 

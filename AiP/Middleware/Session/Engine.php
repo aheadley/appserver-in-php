@@ -12,19 +12,11 @@ class Engine implements \ArrayAccess {
   const PATTERN_ID = '~[A-Za-z0-9,-]+~';
 
   /**
-   * Not sure what this is for yet.
+   * Container for the SID cookie.
    *
-   * @var array
+   * @var \AiP\Middleware\HTTPParser\Cookies
    */
-  private $_cookies = array();
-  
-  /**
-   * The session id cookie headers. Should be a two element array with the header
-   * name as the first element and value as the second.
-   *
-   * @var array
-   */
-  private $_headers = array();
+  private $_cookieJar = null;
   
   /**
    * Storage engine options?
@@ -32,7 +24,7 @@ class Engine implements \ArrayAccess {
    * @var array
    */
   private $_options = array();
-  
+
   /**
    * Flag for session state.
    *
@@ -52,7 +44,7 @@ class Engine implements \ArrayAccess {
    *
    * @var array
    */
-  private $_vars = array();
+  private $_data = array();
   
   /**
    * The storage engine backing this session engine.
@@ -74,38 +66,39 @@ class Engine implements \ArrayAccess {
    * @param array $context 
    */
   public function __construct( array $context ) {
-    if( isset( $context['env']['HTTP_COOKIE'] ) ) {
-      $this->_parseCookies( $context['env']['HTTP_COOKIE'] );
+    $this->_reset();
+    $this->_parseContext( $context );
+    if( (bool)ini_get( 'session.auto_start' ) ) {
+      $this->start();
     }
-    $this->setOptions( array() );
   }
 
   public function offsetExists( $offset ) {
     $this->_ensureStarted();
-    return array_key_exists( $offset, $this->_vars );
+    return array_key_exists( $offset, $this->_data );
   }
   
   public function offsetGet( $offset ) {
     $this->_ensureStarted();
-    if( !array_key_exists( $offset, $this->_vars ) ) {
+    if( !array_key_exists( $offset, $this->_data ) ) {
       $trace = debug_backtrace();
       trigger_error( sprintf( 'Undefined offset: %s in %s at line %d', $offset,
         $trace[1]['file'], $trace[1]['line'] ) );
       return null;
     } else {
-      return $this->_vars[$offset];
+      return $this->_data[$offset];
     }
     return $this->__get( $offset );
   }
   
   public function offsetSet( $offset, $value ) {
     $this->_ensureStarted();
-    $this->_vars[$offset] = $value;
+    $this->_data[$offset] = $value;
   }
   
   public function offsetUnset( $offset ) {
     $this->_ensureStarted();
-    unset( $this->_vars[$offset] );
+    unset( $this->_data[$offset] );
   }
   
   /**
@@ -115,8 +108,8 @@ class Engine implements \ArrayAccess {
    * @return mixed
    */
   public function &getRef( $key ) {
-    if( isset( $this->_vars[$key] ) ) {
-      return $this->_vars[$key];
+    if( isset( $this->_data[$key] ) ) {
+      return $this->_data[$key];
     } else {
       return null;
     }
@@ -132,7 +125,8 @@ class Engine implements \ArrayAccess {
   }
 
   /**
-   * Get the session ID.
+   * Get the session ID. Returns an empty string if the id isn't set (consistent
+   * with PHP builtin methods).
    *
    * @return string
    */
@@ -154,23 +148,32 @@ class Engine implements \ArrayAccess {
     }
   }
   
+  /**
+   * Get the name of the session. This is the token that identifies the SID,
+   * default is PHPSESSID
+   *
+   * @return string
+   */
   public function getName() {
     return $this->_name;
   }
   
+  /**
+   * Set the SID identifying token.
+   *
+   * @param string $name 
+   */
   public function setName( $name ) {
     $this->_ensureNotStarted();
     $this->_name = $name;
-    $this->_options['cookie_name'] = $name;
   }
   
   /**
-   * Set the session options.
+   * Set the SID cookie options.
    *
    * @param array $options 
    */
   public function setOptions( array $options ) {
-    $this->_ensureNotStarted();
     $this->_options = array_merge( $this->_getDefaultOptions(),
       $this->_options, $options );
   }
@@ -198,12 +201,11 @@ class Engine implements \ArrayAccess {
       }
       if( $this->getId() !== '' ) {
         $this->_storage->open( $this->getId() );
-        $this->_vars = $this->_storage->read();
-      } elseif( $this->_cookieIsSet() ) {
-        $this->setId( $this->_storage->open( $this->_getIdFromCookie() ) );
-        $this->_vars = $this->_storage->read();
+        $this->_data = $this->_storage->read();
       } else {
         $this->setId( $this->_storage->create() );
+        //this is assuming we use cookies for the SID which is usually true but
+        // doesn't have to be, should be fixed at some point to handle SID in GET
         $this->_createIdCookie();
       }
       $this->_isStarted = true;
@@ -214,10 +216,7 @@ class Engine implements \ArrayAccess {
    * Alias of writeClose()
    */
   public function commit() {
-    $this->_ensureStarted();
-    $this->_storage->write( $this->_vars );
-    $this->_storage->close();
-    //$this->writeClose();
+    $this->writeClose();
   }
   
   /**
@@ -225,9 +224,8 @@ class Engine implements \ArrayAccess {
    */
   public function writeClose() {
     $this->_ensureStarted();
-    $this->_storage->write( $this->_vars );
+    $this->_storage->write( $this->_data );
     $this->_storage->close();
-    $this->_reset();
   }
 
   /**
@@ -237,7 +235,6 @@ class Engine implements \ArrayAccess {
     $this->_ensureStarted();
     $this->_storage->destroy();
     $this->_dropIdCookie();
-    $this->_reset();
   }
 
   /**
@@ -246,7 +243,7 @@ class Engine implements \ArrayAccess {
    * @return array
    */
   public function getCookieHeader() {
-    return $this->_headers;
+    return $this->_cookieJar->getHeaders();
   }
   
   /**
@@ -262,18 +259,17 @@ class Engine implements \ArrayAccess {
   /**
    * Reset the session engine, used after closing a session.
    */
-  private function _reset( $keepHandler = false ) {
+  private function _reset() {
+    $this->_name = ini_get( 'session.name' );
     $this->_id = null;
-    $this->_vars = array();
-    if( !$keepHandler ) {
-      if( !is_null( $this->_storage ) ) {
-        $this->_storage->close();
-      }
-      $this->_storage = null;
+    $this->_data = array();
+    if( !is_null( $this->_storage ) ) {
+      $this->_storage->close();
     }
-    $this->_headers = array();
+    $this->_storage = null;
+    $this->_options = $this->_getDefaultOptions();
+    $this->_cookieJar = new \AiP\Middleware\HTTPParser\Cookies();
     $this->_isStarted = false;
-    $this->setOptions( array() );
   }
 
   /**
@@ -282,7 +278,7 @@ class Engine implements \ArrayAccess {
    * 
    * @throws LogicException
    */
-  protected function _ensureStarted() {
+  final protected function _ensureStarted() {
     if( !$this->isStarted() ) {
       $trace = debug_backtrace();
       throw new LogicException( sprintf( 'Session has not been started in %s on line %d',
@@ -295,7 +291,7 @@ class Engine implements \ArrayAccess {
    * 
    * @throws LogicException
    */
-  protected function _ensureNotStarted() {
+  final protected function _ensureNotStarted() {
     if( $this->isStarted() ) {
       $trace = debug_backtrace();
       throw new LogicException( sprintf( 'Session has already been started in %s on line %d',
@@ -303,38 +299,6 @@ class Engine implements \ArrayAccess {
     }
   }
   
-  /**
-   * Parse the cookie header value into a name => value array
-   *
-   * @param string $cookiestr 
-   */
-  private function _parseCookies( $cookiestr ) {
-    $pairs = explode( '; ', $cookiestr );
-    $this->_cookies = array( );
-    foreach( $pairs as $pair ) {
-      list($name, $value) = explode( '=', $pair );
-      $this->_cookies[$name] = urldecode( $value );
-    }
-  }
-
-  /**
-   * Check if the session id cookie was set.
-   *
-   * @return bool
-   */
-  private function _cookieIsSet() {
-    return array_key_exists( $this->_options['cookie_name'], $this->_cookies );
-  }
-
-  /**
-   * Get the session id from the session id cookie.
-   *
-   * @return string
-   */
-  private function _getIdFromCookie() {
-    return $this->_cookies[$this->_options['cookie_name']];
-  }
-
   /**
    * Create the session id cookie.
    */
@@ -358,68 +322,48 @@ class Engine implements \ArrayAccess {
    * @param int $expire 
    */
   private function _setIdCookie( $value, $expire ) {
-    $this->_headers[] = 'Set-Cookie';
-    $this->_headers[] = self::_cookieHeaderValue(
-      $this->_options['cookie_name'], $value, $expire,
+    $this->_cookieJar->setcookie( $this->getName(), $value, $expire,
       $this->_options['cookie_path'],
-      $this->_options['cookie_domain'], $this->_options['cookie_secure'], 
+      $this->_options['cookie_domain'],
+      $this->_options['cookie_secure'],
       $this->_options['cookie_httponly'] );
-    $this->_cookies[$this->_options['cookie_name']] = $value;
+  }
+  
+
+  /**
+   * Get an instance of the default session storage handler
+   *
+   * @return Storage\FileStorage 
+   */
+  protected function _getDefaultSaveHandler() {
+    return new Storage\FileStorage();
   }
   
   /**
-   * Check if a cookie name is valid.
+   * Parse the context to read in the SID if it was given to us.
    *
-   * @param string $name
-   * @return bool 
+   * @param array $context 
    */
-  protected static function _validateCookieName( $name ) {
-    return !(bool)strpbrk( $name, "=,; \t\r\n\013\014" );
-  }
-
-  /**
-   * Create the session id cookie header value string.
-   *
-   * @param type $name
-   * @param type $value
-   * @param type $expire
-   * @param type $path
-   * @param type $domain
-   * @param type $secure
-   * @param type $httponly
-   * @return string 
-   */
-  private static function _cookieHeaderValue( $name, $value, $expire, $path,
-    $domain, $secure, $httponly ) {
-    if( !self::_validateCookieName( $name ) ) {
-      throw new UnexpectedValueException(
-        "Cookie names can not contain any of the following:" .
-          " '=,; \\t\\r\\n\\013\\014'" );
-    }
-    $headerValue = $name . '=';
-    if( '' == $value ) {
-      // deleting
-      $headerValue .= 'deleted; expires=' . date( "D, d-M-Y H:i:s T",
-          time() - 31536001 );
-    } else {
-      $headerValue .= urlencode( $value );
-      if( $expire > 0 ) {
-        $headerValue .= '; expires=' . date( "D, d-M-Y H:i:s T", $expire );
+  protected function _parseContext( array $context ) {
+    if( (bool)ini_get( 'session.use_cookies' ) ) {
+      if( isset( $context['_COOKIE'] ) &&
+          isset( $context['_COOKIE'][$this->getName()] ) ) {
+        $this->setId( $context['_COOKIE'][$this->getName()] );
       }
     }
-    if( !is_null( $path ) ) {
-      $headerValue .= '; path=' . $path;
+    if( !(bool)ini_get( 'session.use_only_cookies' ) &&
+        isset( $context['_GET'][$this->getName()] ) ) {
+      $id = $context['_GET'][$this->getName()];
+      //this could be different from the session id in the cookie, not sure
+      // how this is normally handled
+      if( $this->getId() != '' &&
+          $this->getId() != $id ) {
+        //the ids are different, this is probably bad
+        throw new UnexpectedValueException( 'Cookie SID differs from GET SID' );
+      } else {
+        $this->setId( $id );
+      }
     }
-    if( !is_null( $domain ) ) {
-      $headerValue .= '; domain=' . $domain;
-    }
-    if( $secure === true ) {
-      $headerValue .= '; secure';
-    }
-    if( $httponly === true ) {
-      $headerValue .= '; httponly';
-    }
-    return $headerValue;
   }
   
   /**
@@ -429,23 +373,11 @@ class Engine implements \ArrayAccess {
    */
   final protected function _getDefaultOptions() {
     return array(
-      // This is the name of the session ID cookie (regular PHP uses PHPSESSID).
-      'cookie_name' => ini_get( 'session.name' ),
-      'hash_algorithm' => 'sha1',
-      'cookie_lifetime' => ini_get( 'session.cookie_lifetime' ),
       'cookie_path' => ini_get( 'session.cookie_path' ),
+      'cookie_lifetime' => ini_get( 'session.cookie_lifetime' ),
       'cookie_domain' => ini_get( 'session.cookie_domain' ),
       'cookie_secure' => ini_get( 'session.cookie_secure' ),
       'cookie_httponly' => ini_get( 'session.cookie_httponly' ),
     );
-  }
-  
-  /**
-   * Get an instance of the default session storage handler
-   *
-   * @return Storage\FileStorage 
-   */
-  final protected function _getDefaultSaveHandler() {
-    return new Storage\FileStorage();
   }
 }

@@ -66,7 +66,7 @@ class HTTPParser
         }
 
         // Append cookie-headers
-        $result[1] = array_merge($result[1], $ck->_getHeaders());
+        $result[1] = array_merge($result[1], $ck->getHeaders());
 
         // Cleanup
         if (isset($_old_stdin)) {

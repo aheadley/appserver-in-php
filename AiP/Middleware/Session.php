@@ -32,12 +32,10 @@ class Session {
     }
     $session = $context[self::CONTEXT_KEY] = new Session\Engine( $context );
     $result = call_user_func( $this->_app, $context );
-    try {
-      // Add in the session ID cookie headers
-      $result[1] = array_merge( $result[1], $session->getCookieHeader() );
-      $session->commit();
-    } catch( Session\LogicException $e ) {
-      trigger_error( 'Session error: ' . $e->getMessage() );
+    // Add in the session ID cookie headers
+    $result[1] = array_merge( $result[1], $session->getCookieHeader() );
+    if( $session->isStarted() ) {
+      $session->writeClose();
     }
     return $result;
   }

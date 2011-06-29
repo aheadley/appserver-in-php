@@ -4,6 +4,8 @@ namespace AiP\Middleware\Session\Storage;
 
 class FileStorage extends AbstractStorage {
   
+  const CHUNK_SIZE      = 8192;
+  
   protected $_handle    = null;
   
   public function open( $sessionId ) {
@@ -12,14 +14,12 @@ class FileStorage extends AbstractStorage {
       $this->_id = $sessionId;
       $this->_lock();
       if( file_exists( $this->getSessionFilename() ) ) {
-        $this->_data = $this->_unserialize( file_get_contents(
-          $this->getSessionFilename() ) );
+        $this->_data = $this->_unserialize( $this->_read() );
         if( !is_array( $this->_data ) ) {
-          throw new UnexpectedValueException( 'Session data file was empty' );
           $this->_data = array();
         }
       } else {
-        $this->_data = array();
+        throw new RuntimeException( 'Error creating session data file' );
       }
       return $this->_id;
     } else {
@@ -44,10 +44,29 @@ class FileStorage extends AbstractStorage {
     return $this->_data;
   }
   
+  protected function _read() {
+    $data = '';
+    while( !feof( $this->_handle ) ) {
+      $data .= fread( $this->_handle, self::CHUNK_SIZE );
+    }
+    rewind( $this->_handle );
+    return $data;
+  }
+  
   public function write( array $sessionData ) {
     $this->_ensureOpen( true );
     $this->_data = $sessionData;
     $this->_flush();
+  }
+  
+  protected function _write( $data ) {
+    if( rewind( $this->_handle ) &&
+        ftruncate( $this->_handle, 0 ) &&
+        fwrite( $this->_handle, $data ) ) {
+      return null;
+    } else {
+      throw new RuntimeException( 'Error writing to session file' );
+    }
   }
   
   public function destroy() {
@@ -89,7 +108,7 @@ class FileStorage extends AbstractStorage {
    * Write out the session data to disk.
    */
   protected function _flush() {
-    fwrite( $this->_handle, $this->_serialize( $this->_data ) );
+    $this->_write( $this->_serialize( $this->_data ) );
     fflush( $this->_handle );
   }
   
@@ -98,7 +117,7 @@ class FileStorage extends AbstractStorage {
    */
   protected function _lock() {
     if( $this->_handle = fopen( $this->getSessionFilename(), 'c+b' ) ) {
-      flock( $this->_handle, LOCK_EX );
+      flock( $this->_handle, LOCK_SH );
     } else {
       throw new RuntimeException( 'Unable to open session file: ' .
         $this->getSessionFilename() );
